@@ -6,6 +6,8 @@ Everything runs on your own computer. Your recordings never leave it — the int
 
 Because the work runs on the NPU, transcription barely uses the CPU or GPU, so you can keep working normally while a batch of videos is processed in the background.
 
+![NPU Transcriber main window](docs/screenshot.png)
+
 ---
 
 ## Contents
