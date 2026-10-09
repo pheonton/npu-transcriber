@@ -572,8 +572,11 @@ def load_audio(path):
     """Decode any audio/video file to 16 kHz mono float32 using ffmpeg."""
     import numpy as np  # installed together with OpenVINO
 
+    # aresample=async=1 fills gaps in the audio (damaged files, dropped packets) and a late
+    # start with silence, so positions in the samples match the video's timeline.
     cmd = ["ffmpeg", "-nostdin", "-loglevel", "error", "-i", path,
-           "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", "-"]
+           "-vn", "-af", "aresample=async=1:first_pts=0",
+           "-ac", "1", "-ar", str(SAMPLE_RATE), "-f", "f32le", "-"]
     try:
         raw = subprocess.run(cmd, capture_output=True, check=True).stdout
     except FileNotFoundError:
