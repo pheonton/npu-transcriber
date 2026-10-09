@@ -313,10 +313,17 @@ def apply_theme(root):
     root.option_add("*Scrollbar.width", px(14))  # classic Tk scrollbar of the log box
     # Tk's file dialog lists dot-files by default. Its code is loaded on first use, so
     # trigger loading with an invalid call, then hide them and add a "Show hidden" toggle.
+    # Its file list is also a fixed 400x120 pixels - wrap the builder to scale it.
     try:
         root.tk.call("catch", "tk_getOpenFile -no-such-option")
         root.tk.call("set", "::tk::dialog::file::showHiddenBtn", "1")
         root.tk.call("set", "::tk::dialog::file::showHiddenVar", "0")
+        root.tk.eval("""
+            rename ::tk::dialog::file::Create ::tk::dialog::file::CreateUnscaled
+            proc ::tk::dialog::file::Create {w class} {
+                ::tk::dialog::file::CreateUnscaled $w $class
+                $w.contents.icons.cHull.canvas configure -width %d -height %d
+            }""" % (px(400), px(120)))
     except tk.TclError:
         pass
 
