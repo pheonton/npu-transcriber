@@ -311,6 +311,14 @@ def apply_theme(root):
         style.configure(name, arrowsize=px(14))
     style.configure("Horizontal.TProgressbar", thickness=px(14), arrowsize=px(14))
     root.option_add("*Scrollbar.width", px(14))  # classic Tk scrollbar of the log box
+    # Tk's file dialog lists dot-files by default. Its code is loaded on first use, so
+    # trigger loading with an invalid call, then hide them and add a "Show hidden" toggle.
+    try:
+        root.tk.call("catch", "tk_getOpenFile -no-such-option")
+        root.tk.call("set", "::tk::dialog::file::showHiddenBtn", "1")
+        root.tk.call("set", "::tk::dialog::file::showHiddenVar", "0")
+    except tk.TclError:
+        pass
 
 
 class LogBox(scrolledtext.ScrolledText):
