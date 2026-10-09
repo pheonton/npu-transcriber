@@ -328,6 +328,68 @@ def apply_theme(root):
         pass
 
 
+# ================================================================ file choosers
+# GNOME's file chooser via zenity when installed, otherwise Tk's own.
+
+def run_chooser(parent, cmd):
+    """Run a chooser tool while the window keeps redrawing but ignores clicks.
+
+    Returns the chosen paths, [] if cancelled, or None if the tool failed (then use Tk's)."""
+    win = parent.winfo_toplevel()
+    try:
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                text=True, encoding="utf-8", errors="surrogateescape")
+    except OSError:
+        return None
+    try:
+        win.tk.call("tk", "busy", "hold", win)
+    except tk.TclError:
+        pass
+    try:
+        while proc.poll() is None:
+            win.update()
+            time.sleep(0.03)
+    finally:
+        try:
+            win.tk.call("tk", "busy", "forget", win)
+        except tk.TclError:
+            pass
+    out = proc.stdout.read()
+    if proc.returncode == 1:
+        return []
+    if proc.returncode != 0:
+        return None
+    return [line for line in out.splitlines() if line]
+
+
+def ask_files(parent, title, filetypes, initialdir=None):
+    """Let the user pick one or more files; returns a list of paths (empty if cancelled)."""
+    start = initialdir or os.path.expanduser("~")
+    paths = None
+    if shutil.which("zenity"):
+        cmd = ["zenity", "--file-selection", "--multiple", "--separator=\n",
+               "--title", title, "--filename", os.path.join(start, "")]
+        for name, patterns in filetypes:
+            cmd.append(f"--file-filter={name} | {patterns}")
+        paths = run_chooser(parent, cmd)
+    if paths is None:
+        paths = filedialog.askopenfilenames(parent=parent, title=title, filetypes=filetypes,
+                                            initialdir=start)
+    return list(paths)
+
+
+def ask_folder(parent, title, initialdir=None):
+    """Let the user pick a folder; returns its path, or "" if cancelled."""
+    start = initialdir or os.path.expanduser("~")
+    paths = None
+    if shutil.which("zenity"):
+        paths = run_chooser(parent, ["zenity", "--file-selection", "--directory",
+                                     "--title", title, "--filename", os.path.join(start, "")])
+    if paths is None:
+        return filedialog.askdirectory(parent=parent, title=title, initialdir=start) or ""
+    return paths[0] if paths else ""
+
+
 class LogBox(scrolledtext.ScrolledText):
     def __init__(self, parent, **kw):
         super().__init__(parent, wrap="word", state="disabled", **kw)
@@ -427,8 +489,7 @@ class SetupWindow(tk.Tk):
         self.go_btn.config(state="disabled" if blocking else "normal")
 
     def _choose_other(self):
-        folder = filedialog.askdirectory(title="Choose a Python environment, or an empty folder for a new one",
-                                         initialdir=os.path.expanduser("~"))
+        folder = ask_folder(self, "Choose a Python environment, or an empty folder for a new one")
         if not folder:
             return
         update_config(env=folder)
@@ -721,8 +782,7 @@ class ModelDialog(tk.Toplevel):
             pass
 
     def _browse(self):
-        folder = filedialog.askdirectory(parent=self, title="Where to save models",
-                                         initialdir=os.path.expanduser("~"))
+        folder = ask_folder(self, "Where to save models")
         if folder:
             self.dest_var.set(folder)
 
@@ -1072,8 +1132,8 @@ class App(tk.Tk):
         restart_with_system_python(files)     # no environment there yet -> setup window
 
     def _pick_env(self):
-        folder = filedialog.askdirectory(title="Choose a Python environment (venv folder)",
-                                         initialdir=os.path.dirname(self.env_var.get()) or os.path.expanduser("~"))
+        folder = ask_folder(self, "Choose a Python environment (venv folder)",
+                            initialdir=os.path.dirname(self.env_var.get()))
         if not folder:
             return
         if not is_venv(folder) and not safe_to_create(folder):
@@ -1130,7 +1190,7 @@ class App(tk.Tk):
         return list(self.listbox.get(0, "end"))
 
     def _add_files(self):
-        paths = filedialog.askopenfilenames(title="Choose videos or audio files", filetypes=MEDIA_TYPES)
+        paths = ask_files(self, "Choose videos or audio files", MEDIA_TYPES)
         existing = set(self._files())
         for p in paths:
             if p not in existing:
@@ -1144,8 +1204,8 @@ class App(tk.Tk):
         self.listbox.delete(0, "end")
 
     def _pick_model(self):
-        folder = filedialog.askdirectory(title="Choose an OpenVINO Whisper model folder",
-                                         initialdir=MODELS_DIR if os.path.isdir(MODELS_DIR) else os.path.expanduser("~"))
+        folder = ask_folder(self, "Choose an OpenVINO Whisper model folder",
+                            initialdir=MODELS_DIR if os.path.isdir(MODELS_DIR) else None)
         if not folder:
             return
         if not looks_like_model(folder):
@@ -1227,8 +1287,7 @@ class App(tk.Tk):
         self._update_model_status()
 
     def _pick_output(self):
-        folder = filedialog.askdirectory(title="Choose where to save transcripts",
-                                         initialdir=os.path.expanduser("~"))
+        folder = ask_folder(self, "Choose where to save transcripts")
         if folder:
             self.out_var.set(folder)
 
