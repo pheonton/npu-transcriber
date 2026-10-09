@@ -63,6 +63,7 @@ os.environ.setdefault("PIP_DISABLE_PIP_VERSION_CHECK", "1")
 try:
     import tkinter as tk
     from tkinter import filedialog, messagebox, scrolledtext, ttk
+    import tkinter.font as tkfont
 except ImportError:
     sys.exit("NPU Transcriber needs Tkinter for its window.\n"
              "Install it with:  sudo apt install python3-tk")
@@ -232,6 +233,7 @@ def npu_problem(devices):
 
 # ================================================================ shared UI bits
 
+FONT_SIZE = 11  # points, like GNOME's default text size
 UI_SCALE = 1.0  # set by apply_theme() from the desktop's DPI setting
 
 
@@ -294,6 +296,13 @@ def apply_theme(root):
     UI_SCALE = min(4.0, max(0.75, detect_ui_scale(root)))
     # Fonts are sized in points; tk scaling = screen pixels per point.
     root.tk.call("tk", "scaling", UI_SCALE * 96 / 72)
+    # Tk's standard fonts are 10 pt; match GNOME's default text size instead.
+    for name in ("TkDefaultFont", "TkTextFont", "TkFixedFont", "TkMenuFont", "TkHeadingFont",
+                 "TkCaptionFont", "TkTooltipFont", "TkIconFont"):
+        tkfont.nametofont(name).configure(size=FONT_SIZE)
+    family = tkfont.nametofont("TkDefaultFont").actual("family")
+    # Created in Tk directly: a tkfont.Font object deletes its font when garbage-collected.
+    root.tk.call("font", "create", "AppHeading", "-family", family, "-size", FONT_SIZE + 3, "-weight", "bold")
     style = ttk.Style(root)
     try:
         style.theme_use("clam")
@@ -418,7 +427,7 @@ class SetupWindow(tk.Tk):
         self.worker = None
 
         pad = {"padx": px(14), "pady": px(6)}
-        ttk.Label(self, text="Python environment setup", font=("TkDefaultFont", 13, "bold")).pack(anchor="w", **pad)
+        ttk.Label(self, text="Python environment setup", font="AppHeading").pack(anchor="w", **pad)
         self.intro = ttk.Label(self, wraplength=px(660), justify="left")
         self.intro.pack(anchor="w", fill="x", **pad)
         self.checks = ttk.Label(self, wraplength=px(660), justify="left")
